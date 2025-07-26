@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>I'm Trying to Save You!</name>
+  <packageId>S4.ImTryingToSaveYou</packageId>
+  <author>SP4RTAN</author>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <description>Removes the faction penalty when forcing a pawn from another faction to wear something</description>
+    <loadAfter>
+        <li>brrainz.harmony</li>
+    </loadAfter>
+    <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077</steamWorkshopUrl>
+    </li>
+  </modDependencies>
+</ModMetaData>
+
+
