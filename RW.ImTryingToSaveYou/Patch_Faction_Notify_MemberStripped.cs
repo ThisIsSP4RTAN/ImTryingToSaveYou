@@ -1,63 +1,34 @@
-﻿using HarmonyLib;
+﻿using System.Reflection;
+using HarmonyLib;
 using RimWorld;
 using Verse;
-using System.Collections.Generic;
 using Verse.AI;
 
-namespace ImTryingToSaveYou
+namespace S4.ImTryingToSaveYou
 {
     [StaticConstructorOnStartup]
-    public static class Patch_Faction_Notify_MemberStripped
+    public static class Patch_ForceTargetWear_SkipStripFinishAction
     {
-        // Keep track of which pawns are being forcibly dressed
-        public static readonly HashSet<Pawn> JustForceDressed = new HashSet<Pawn>();
-
-        static Patch_Faction_Notify_MemberStripped()
+        static Patch_ForceTargetWear_SkipStripFinishAction()
         {
-            var harmony = new Harmony("ImTryingToSaveYou");
-            harmony.Patch(
-                AccessTools.Method(typeof(Faction), nameof(Faction.Notify_MemberStripped)),
-                prefix: new HarmonyMethod(typeof(Patch_Faction_Notify_MemberStripped), nameof(Notify_MemberStripped_Prefix)),
-                postfix: new HarmonyMethod(typeof(Patch_Faction_Notify_MemberStripped), nameof(Notify_MemberStripped_Postfix))
-            );
-
-            harmony.Patch(
-                AccessTools.Method(typeof(JobDriver_ForceTargetWear), "MakeNewToils"),
-                postfix: new HarmonyMethod(typeof(Patch_Faction_Notify_MemberStripped), nameof(MakeNewToils_Postfix))
-            );
-            // Log.Message("[ImTryingToSaveYou] Loader loaded, all patches applied!");
+            var harmony = new Harmony("net.S4.ImTryingToSaveYou");
+            // target the compiler-generated "finish" lambda inside ForceTargetWear.MakeNewToils
+            var original = typeof(JobDriver_ForceTargetWear)
+                           .GetMethod("<MakeNewToils>b__16_1",
+                                      BindingFlags.Instance | BindingFlags.NonPublic);
+            var prefix = new HarmonyMethod(typeof(Patch_ForceTargetWear_SkipStripFinishAction),
+                                            nameof(Prefix));
+            harmony.Patch(original, prefix: prefix);
         }
 
-        // Called when MakeNewToils for ForceTargetWear completes; mark pawn as "just forcibly dressed"
-        public static void MakeNewToils_Postfix(JobDriver_ForceTargetWear __instance)
+        // this will run *instead* of the original finish‑action, so we
+        // only do the EndCurrentJob snippet and *never* call Notify_MemberStripped
+        static bool Prefix(JobDriver_ForceTargetWear __instance)
         {
-            if (__instance?.job != null)
-            {
-                Pawn targetPawn = __instance.job.GetTarget(TargetIndex.A).Thing as Pawn;
-                if (targetPawn != null)
-                {
-                    JustForceDressed.Add(targetPawn);
-                   // Log.Message($"[ImTryingToSaveYou] Marking {targetPawn} as just forcibly dressed.");
-                }
-            }
-        }
-
-        // Prefix for Notify_MemberStripped - skip penalty if we just forcibly dressed this pawn
-        public static bool Notify_MemberStripped_Prefix(Pawn member, Faction violator)
-        {
-            if (JustForceDressed.Contains(member))
-            {
-               // Log.Message($"[ImTryingToSaveYou] Suppressing penalty for {member} stripped by {violator}.");
-                JustForceDressed.Remove(member);
-                return false; // skip original, do NOT apply penalty
-            }
-            return true; // run vanilla
-        }
-
-        // Postfix to clean up state (for any edge case)
-        public static void Notify_MemberStripped_Postfix(Pawn member, Faction violator)
-        {
-            JustForceDressed.Remove(member);
+            var targetPawn = __instance.job.GetTarget(TargetIndex.A).Thing as Pawn;
+            if (targetPawn != null && targetPawn.CurJobDef == JobDefOf.Wait_MaintainPosture)
+                targetPawn.jobs.EndCurrentJob(JobCondition.InterruptForced);
+            return false; // skip the original (which would have called Notify_MemberStripped)
         }
     }
 }
