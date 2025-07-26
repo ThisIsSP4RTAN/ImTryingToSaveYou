@@ -25,21 +25,38 @@ namespace ImTryingToSaveYou
                 AccessTools.Method(typeof(JobDriver_ForceTargetWear), "MakeNewToils"),
                 postfix: new HarmonyMethod(typeof(Patch_Faction_Notify_MemberStripped), nameof(MakeNewToils_Postfix))
             );
-            // Log.Message("[ImTryingToSaveYou] Loader loaded, all patches applied!");
         }
 
-        // Called when MakeNewToils for ForceTargetWear completes; mark pawn as "just forcibly dressed"
-        public static void MakeNewToils_Postfix(JobDriver_ForceTargetWear __instance)
+        // Postfix for MakeNewToils: attach a cleanup action to the final toil to track status
+        public static void MakeNewToils_Postfix(JobDriver_ForceTargetWear __instance, ref IEnumerable<Toil> __result)
         {
-            if (__instance?.job != null)
+            // Defensive: convert to list so we can attach to the final Toil
+            var list = __result as List<Toil> ?? new List<Toil>(__result);
+            if (list.Count == 0) return;
+
+            // Find the last Toil (should be the one that completes the dress job)
+            var finalToil = list[list.Count - 1];
+
+            finalToil.AddPreInitAction(() =>
             {
-                Pawn targetPawn = __instance.job.GetTarget(TargetIndex.A).Thing as Pawn;
-                if (targetPawn != null)
+                // Remove flag in case it's hanging around from failed jobs
+                var pawn = __instance.job?.GetTarget(TargetIndex.A).Thing as Pawn;
+                if (pawn != null)
+                    JustForceDressed.Remove(pawn);
+            });
+
+            finalToil.AddFinishAction(() =>
+            {
+                // Only set the flag if the job finished normally
+                var pawn = __instance.job?.GetTarget(TargetIndex.A).Thing as Pawn;
+                if (pawn != null && __instance.pawn.jobs.curDriver == __instance)
                 {
-                    JustForceDressed.Add(targetPawn);
-                   // Log.Message($"[ImTryingToSaveYou] Marking {targetPawn} as just forcibly dressed.");
+                    JustForceDressed.Add(pawn);
+                    // Log.Message($"[ImTryingToSaveYou] Marked {pawn} as forcibly dressed (job finished normally).");
                 }
-            }
+            });
+
+            __result = list;
         }
 
         // Prefix for Notify_MemberStripped - skip penalty if we just forcibly dressed this pawn
@@ -47,7 +64,7 @@ namespace ImTryingToSaveYou
         {
             if (JustForceDressed.Contains(member))
             {
-               // Log.Message($"[ImTryingToSaveYou] Suppressing penalty for {member} stripped by {violator}.");
+                // Log.Message($"[ImTryingToSaveYou] Suppressing penalty for {member} stripped by {violator}.");
                 JustForceDressed.Remove(member);
                 return false; // skip original, do NOT apply penalty
             }
