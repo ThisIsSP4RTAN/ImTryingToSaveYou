@@ -4,14 +4,14 @@ using RimWorld;
 using Verse;
 using Verse.AI;
 
-namespace S4.ImTryingToSaveYou
+namespace ImTryingToSaveYou
 {
     [StaticConstructorOnStartup]
     public static class Patch_ForceTargetWear_SkipStripFinishAction
     {
         static Patch_ForceTargetWear_SkipStripFinishAction()
         {
-            var harmony = new Harmony("net.S4.ImTryingToSaveYou");
+            var harmony = new Harmony("net.S4.ImTryingToSaveYou.skipmemberstripped");
 
             // Patch the finish-action delegate to skip Notify_MemberStripped entirely
             var finishMethod = typeof(JobDriver_ForceTargetWear)
