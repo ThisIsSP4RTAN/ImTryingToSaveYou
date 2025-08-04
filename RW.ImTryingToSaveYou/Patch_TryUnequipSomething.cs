@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
+using LudeonTK;
 using RimWorld;
 using Verse;
 using Verse.AI;
@@ -55,8 +57,35 @@ namespace ImTryingToSaveYou
         public static bool WasOriginallyWearing(Pawn pawn, Apparel app)
         {
             if (pawn == null || app == null) return false;
-            HashSet<int> set;
-            return _originalApparel.TryGetValue(pawn, out set) && set.Contains(app.thingIDNumber);
+            return _originalApparel.TryGetValue(pawn, out var set) && set.Contains(app.thingIDNumber);
+        }
+
+        // **ADDED**: manually rebuild the tracker for all current pawns
+        public static void RebuildAll()
+        {
+            _originalApparel.Clear();
+            foreach (var map in Find.Maps)
+            {
+                foreach (var pawn in map.mapPawns.AllPawnsSpawned)
+                {
+                    if (pawn.Faction == null || pawn.Faction == Faction.OfPlayer ||
+                        pawn.Faction.HostileTo(Faction.OfPlayer) || !pawn.RaceProps.Humanlike)
+                        continue;
+
+                    var ids = pawn.apparel?.WornApparel.Select(a => a.thingIDNumber)
+                              ?? Enumerable.Empty<int>();
+                    _originalApparel[pawn] = new HashSet<int>(ids);
+                }
+            }
+            Log.Warning($"[ImTryingToSaveYou] OriginalApparelTracker rebuilt for {_originalApparel.Count} pawns");
+        }
+
+        // **ADDED**: manually clear all tracked records
+        public static void Clear()
+        {
+            int count = _originalApparel.Count;
+            _originalApparel.Clear();
+            Log.Warning($"[ImTryingToSaveYou] OriginalApparelTracker cleared ({count} records removed)");
         }
     }
 
@@ -127,6 +156,24 @@ namespace ImTryingToSaveYou
 
             // skip original TryUnequipSomething entirely
             return false;
+        }
+    }
+
+    // 3) DEBUG ACTIONS: add two buttons under the “ImTryingToSaveYou” category
+    [StaticConstructorOnStartup]
+    static class Debug_OriginalApparelTracker
+    {
+        // Strip out actionType & allowedGameStates – they aren’t valid named args here
+        [DebugAction("ImTryingToSaveYou", "Rebuild Original Apparel Tracker")]
+        public static void DebugRebuildTracker()
+        {
+            OriginalApparelTracker.RebuildAll();
+        }
+
+        [DebugAction("ImTryingToSaveYou", "Clear Original Apparel Tracker")]
+        public static void DebugClearTracker()
+        {
+            OriginalApparelTracker.Clear();
         }
     }
 }
