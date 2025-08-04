@@ -34,19 +34,24 @@ namespace ImTryingToSaveYou
             // don't overwrite on load
             if (respawningAfterLoad)
                 return;
+            // skip player pawns
+            if (__instance.Faction == Faction.OfPlayer)
+                return;
+            // skip hostile pawns — no need to track their originals
+            if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer))
+                return;
+            // only track those capable of wearing apparel
+            if (!__instance.RaceProps.Humanlike)
+                return;
 
-            // only non-player-faction pawns
-            if (__instance.Faction != Faction.OfPlayer)
-            {
-                var defs = __instance.apparel?.WornApparel.Select(a => a.def)
-                           ?? Enumerable.Empty<ThingDef>();
-                _originalApparel[__instance] = new HashSet<ThingDef>(defs);
+            var defs = __instance.apparel?.WornApparel.Select(a => a.def)
+                       ?? Enumerable.Empty<ThingDef>();
+            _originalApparel[__instance] = new HashSet<ThingDef>(defs);
 
-                Log.Warning(
-                    $"[OriginalApparelTracker] Pawn “{__instance.LabelShort}” appeared on map “{map?.Tile}” " +
-                    $"tracking original apparel: {string.Join(", ", defs.Select(d => d.defName))}"
-                );
-            }
+            Log.Warning(
+                $"[OriginalApparelTracker] Pawn “{__instance.LabelShort}” appeared on map “{map?.Tile}” " +
+                $"tracking original apparel: {string.Join(", ", defs.Select(d => d.defName))}"
+            );
         }
 
         static void DeSpawn_Prefix(Pawn __instance)
@@ -119,7 +124,7 @@ namespace ImTryingToSaveYou
                         if (!GenPlace.TryPlaceThing(oldApparel, targetPawn.PositionHeld, targetPawn.Map, ThingPlaceMode.Near))
                             Log.Error($"[ImTryingToSaveYou] Could not drop {oldApparel} at {targetPawn.PositionHeld}");
 
-                        // and forbid it if they're hostile
+                        // and forbid it if they're hostile like vanilla does
                         if (targetPawn.Faction != null && targetPawn.Faction.HostileTo(Faction.OfPlayer))
                             oldApparel.SetForbidden(true);
                     }
