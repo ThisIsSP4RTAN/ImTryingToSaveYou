@@ -7,12 +7,12 @@ using Verse.AI;
 
 namespace ImTryingToSaveYou
 {
-    // 1) TRACKER: remember each pawns original apparel on spawn, forget it on despawn
+    // 1) TRACKER: remember each pawn’s exact Apparel instances on spawn, forget on despawn
     [StaticConstructorOnStartup]
     static class OriginalApparelTracker
     {
-        // pawn → set of ThingDef they started with
-        static readonly Dictionary<Pawn, HashSet<ThingDef>> _originalApparel = new Dictionary<Pawn, HashSet<ThingDef>>();
+        // pawn → set of the thingIDNumbers of Apparel they started with
+        static readonly Dictionary<Pawn, HashSet<int>> _originalApparel = new Dictionary<Pawn, HashSet<int>>();
 
         static OriginalApparelTracker()
         {
@@ -31,35 +31,32 @@ namespace ImTryingToSaveYou
 
         static void SpawnSetup_Postfix(Pawn __instance, Map map, bool respawningAfterLoad)
         {
-            // don't overwrite on load
-            if (respawningAfterLoad) return;
-            // skip player pawns
-            if (__instance.Faction == Faction.OfPlayer) return;
-            // skip hostile pawns — no need to track their originals
+            if (respawningAfterLoad) return;                                  // don’t overwrite on load
+            if (__instance.Faction == Faction.OfPlayer) return;               // skip player pawns
             if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;
-            // only track those capable of wearing apparel
-            if (!__instance.RaceProps.Humanlike) return;
+            if (!__instance.RaceProps.Humanlike) return;                      // only humanlikes
 
-            var defs = __instance.apparel?.WornApparel.Select(a => a.def)
-                       ?? Enumerable.Empty<ThingDef>();
-            _originalApparel[__instance] = new HashSet<ThingDef>(defs);
+            // grab the unique instance IDs of everything they’re wearing
+            IEnumerable<int> ids = Enumerable.Empty<int>();
+            if (__instance.apparel != null)
+                ids = __instance.apparel.WornApparel.Select(a => a.thingIDNumber);
 
-            Log.Warning(
-                $"[OriginalApparelTracker] Pawn “{__instance.LabelShort}” appeared on map “{map?.Tile}” " +
-                $"tracking original apparel: {string.Join(", ", defs.Select(d => d.defName))}"
-            );
+            _originalApparel[__instance] = new HashSet<int>(ids);
+
+            Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” spawned, tracking apparel IDs: {string.Join(", ", ids)}");
         }
 
         static void DeSpawn_Prefix(Pawn __instance)
         {
             bool removed = _originalApparel.Remove(__instance);
-            Log.Warning($"[OriginalApparelTracker] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
+            Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
         }
 
         public static bool WasOriginallyWearing(Pawn pawn, Apparel app)
         {
             if (pawn == null || app == null) return false;
-            return _originalApparel.TryGetValue(pawn, out var set) && set.Contains(app.def);
+            HashSet<int> set;
+            return _originalApparel.TryGetValue(pawn, out set) && set.Contains(app.thingIDNumber);
         }
     }
 
@@ -70,12 +67,10 @@ namespace ImTryingToSaveYou
         static Patch_ForceTargetWear_TryUnequipSomething()
         {
             var harmony = new Harmony("net.S4.ImTryingToSaveYou.tryunequip");
-            var jobType = typeof(JobDriver_ForceTargetWear);
-            // find the private method via reflection
-            var tryUnequip = AccessTools.Method(jobType, "TryUnequipSomething");
+            var tryUnequip = AccessTools.Method(typeof(JobDriver_ForceTargetWear), "TryUnequipSomething");
             if (tryUnequip == null)
             {
-                Log.Warning("[ImTryingToSaveYou] TryUnequipSomething not found → skipping patch.");
+                Log.Warning("[ImTryingToSaveYou] TryUnequipSomething not found; skipping patch.");
                 return;
             }
 
@@ -107,8 +102,9 @@ namespace ImTryingToSaveYou
                     // remove it from their body
                     targetPawn.apparel.Remove(oldApparel);
 
-                    // if it was one of their originals, stash it in their inventory
-                    if (OriginalApparelTracker.WasOriginallyWearing(targetPawn, oldApparel) && targetPawn.inventory != null)
+                    // if it was *that exact instance* they came in wearing, stash in inventory
+                    if (OriginalApparelTracker.WasOriginallyWearing(targetPawn, oldApparel)
+                        && targetPawn.inventory != null)
                     {
                         // try to add to inventory
                         if (!targetPawn.inventory.innerContainer.TryAdd(oldApparel))
