@@ -7,13 +7,12 @@ using Verse.AI;
 
 namespace ImTryingToSaveYou
 {
-    // 1) TRACKER: remember each pawn's original apparel on spawn, forget it on despawn
+    // 1) TRACKER: remember each pawns original apparel on spawn, forget it on despawn
     [StaticConstructorOnStartup]
     static class OriginalApparelTracker
     {
         // pawn → set of ThingDef they started with
-        static readonly Dictionary<Pawn, HashSet<ThingDef>> _originalApparel =
-            new Dictionary<Pawn, HashSet<ThingDef>>();
+        static readonly Dictionary<Pawn, HashSet<ThingDef>> _originalApparel = new Dictionary<Pawn, HashSet<ThingDef>>();
 
         static OriginalApparelTracker()
         {
@@ -32,6 +31,10 @@ namespace ImTryingToSaveYou
 
         static void SpawnSetup_Postfix(Pawn __instance, Map map, bool respawningAfterLoad)
         {
+            // don't overwrite on load
+            if (respawningAfterLoad)
+                return;
+
             // only non-player-faction pawns
             if (__instance.Faction != Faction.OfPlayer)
             {
@@ -42,7 +45,7 @@ namespace ImTryingToSaveYou
                 Log.Warning(
                     $"[OriginalApparelTracker] Pawn “{__instance.LabelShort}” appeared on map “{map?.Tile}” " +
                     $"tracking original apparel: {string.Join(", ", defs.Select(d => d.defName))}"
-);
+                );
             }
         }
 
@@ -54,9 +57,7 @@ namespace ImTryingToSaveYou
         public static bool WasOriginallyWearing(Pawn pawn, Apparel app)
         {
             if (pawn == null || app == null) return false;
-            if (_originalApparel.TryGetValue(pawn, out var set))
-                return set.Contains(app.def);
-            return false;
+            return _originalApparel.TryGetValue(pawn, out var set) && set.Contains(app.def);
         }
     }
 
