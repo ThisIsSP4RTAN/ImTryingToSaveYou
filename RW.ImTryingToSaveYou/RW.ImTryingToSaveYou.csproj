@@ -66,6 +66,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Patch_Faction_Notify_MemberStripped.cs" />
+    <Compile Include="Patch_TryUnequipSomething.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
