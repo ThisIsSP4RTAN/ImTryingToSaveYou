@@ -32,17 +32,13 @@ namespace ImTryingToSaveYou
         static void SpawnSetup_Postfix(Pawn __instance, Map map, bool respawningAfterLoad)
         {
             // don't overwrite on load
-            if (respawningAfterLoad)
-                return;
+            if (respawningAfterLoad) return;
             // skip player pawns
-            if (__instance.Faction == Faction.OfPlayer)
-                return;
+            if (__instance.Faction == Faction.OfPlayer) return;
             // skip hostile pawns — no need to track their originals
-            if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer))
-                return;
+            if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;
             // only track those capable of wearing apparel
-            if (!__instance.RaceProps.Humanlike)
-                return;
+            if (!__instance.RaceProps.Humanlike) return;
 
             var defs = __instance.apparel?.WornApparel.Select(a => a.def)
                        ?? Enumerable.Empty<ThingDef>();
@@ -56,7 +52,8 @@ namespace ImTryingToSaveYou
 
         static void DeSpawn_Prefix(Pawn __instance)
         {
-            _originalApparel.Remove(__instance);
+            bool removed = _originalApparel.Remove(__instance);
+            Log.Warning($"[OriginalApparelTracker] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
         }
 
         public static bool WasOriginallyWearing(Pawn pawn, Apparel app)
@@ -110,9 +107,8 @@ namespace ImTryingToSaveYou
                     // remove it from their body
                     targetPawn.apparel.Remove(oldApparel);
 
-                    // only stash it if it was one of their originals
-                    bool originallyTheirs = OriginalApparelTracker.WasOriginallyWearing(targetPawn, oldApparel);
-                    if (originallyTheirs && targetPawn.inventory != null)
+                    // if it was one of their originals, stash it in their inventory
+                    if (OriginalApparelTracker.WasOriginallyWearing(targetPawn, oldApparel) && targetPawn.inventory != null)
                     {
                         // try to add to inventory
                         if (!targetPawn.inventory.innerContainer.TryAdd(oldApparel))
