@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
 using LudeonTK;
@@ -33,15 +32,14 @@ namespace ImTryingToSaveYou
 
         static void SpawnSetup_Postfix(Pawn __instance, Map map, bool respawningAfterLoad)
         {
-            if (respawningAfterLoad) return;                                  // don’t overwrite on load
-            if (__instance.Faction == Faction.OfPlayer) return;               // skip player pawns
-            if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;
-            if (!__instance.RaceProps.Humanlike) return;                      // only humanlikes
+            if (respawningAfterLoad) return;                                                            // don’t overwrite on load
+            if (__instance.Faction == Faction.OfPlayer) return;                                         // skip player pawns
+            if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;   // skip pawns from hostile factions
+            if (!__instance.RaceProps.Humanlike) return;                                                // only humanlikes
 
             // grab the unique instance IDs of everything they’re wearing
-            IEnumerable<int> ids = Enumerable.Empty<int>();
-            if (__instance.apparel != null)
-                ids = __instance.apparel.WornApparel.Select(a => a.thingIDNumber);
+            var ids = __instance.apparel?.WornApparel.Select(a => a.thingIDNumber)
+                      ?? Enumerable.Empty<int>();
 
             _originalApparel[__instance] = new HashSet<int>(ids);
 
@@ -50,6 +48,9 @@ namespace ImTryingToSaveYou
 
         static void DeSpawn_Prefix(Pawn __instance)
         {
+            if (__instance.Faction == Faction.OfPlayer) return;                                         // skip player pawns
+            if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;   // skip pawns from hostile factions
+            if (!__instance.RaceProps.Humanlike) return;                                                // only humanlikes
             bool removed = _originalApparel.Remove(__instance);
             Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
         }
@@ -59,6 +60,9 @@ namespace ImTryingToSaveYou
             if (pawn == null || app == null) return false;
             return _originalApparel.TryGetValue(pawn, out var set) && set.Contains(app.thingIDNumber);
         }
+
+        // **NEW**: expose the internal dictionary for debugging
+        public static IReadOnlyDictionary<Pawn, HashSet<int>> Records => _originalApparel;
 
         // **ADDED**: manually rebuild the tracker for all current pawns
         public static void RebuildAll()
@@ -159,7 +163,7 @@ namespace ImTryingToSaveYou
         }
     }
 
-    // 3) DEBUG ACTIONS: add two buttons under the “ImTryingToSaveYou” category
+    // 3) DEBUG ACTIONS: add three buttons under the “ImTryingToSaveYou” category
     [StaticConstructorOnStartup]
     static class Debug_OriginalApparelTracker
     {
@@ -174,6 +178,19 @@ namespace ImTryingToSaveYou
         public static void DebugClearTracker()
         {
             OriginalApparelTracker.Clear();
+        }
+
+        [DebugAction("ImTryingToSaveYou", "List Original Apparel Records")]
+        public static void DebugListTracker()
+        {
+            var records = OriginalApparelTracker.Records;
+            Log.Warning($"[ImTryingToSaveYou] Tracker has {records.Count} pawn(s):");
+            foreach (var kvp in records)
+            {
+                var pawn = kvp.Key;
+                var ids = kvp.Value;
+                Log.Warning($"  • {pawn.LabelShort}: {string.Join(", ", ids)}");
+            }
         }
     }
 }
