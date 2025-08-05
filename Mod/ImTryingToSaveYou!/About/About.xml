@@ -8,11 +8,11 @@
   </supportedVersions>
   <description>Overhauls the 1.6 pawn dressing mechanic.
   
-  Removes faction penalty when forcing a pawn to wear something.
+Removes faction penalty when forcing a pawn to wear something.
   
-  When dressing a pawn from another faction in apparel that replaces something they're wearing, their apparel is stored in their inventory.
+When dressing a pawn from another faction in apparel that replaces something they're wearing, their apparel is stored in their inventory.
   
-  Records what any non-hostile, humanlike pawns that enter the map are wearing so that only their apparel is placed in their inventory. Apparel that was originally yours will be dropped.</description>
+Records what any non-hostile, humanlike pawns that enter the map are wearing so that only their apparel is placed in their inventory. Apparel that was originally yours will be dropped.</description>
     <loadAfter>
         <li>brrainz.harmony</li>
     </loadAfter>
