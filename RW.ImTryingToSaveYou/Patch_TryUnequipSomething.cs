@@ -8,7 +8,7 @@ using Verse.AI;
 
 namespace ImTryingToSaveYou
 {
-    // 1) TRACKER: remember each pawn’s exact Apparel instances on spawn, forget on despawn
+    // 1) TRACKER: remember each pawns exact Apparel instances on spawn, forget on despawn
     [StaticConstructorOnStartup]
     static class OriginalApparelTracker
     {
@@ -43,7 +43,7 @@ namespace ImTryingToSaveYou
 
             _originalApparel[__instance] = new HashSet<int>(ids);
 
-            Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” spawned, tracking apparel IDs: {string.Join(", ", ids)}");
+            // Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” spawned, tracking apparel IDs: {string.Join(", ", ids)}");
         }
 
         static void DeSpawn_Prefix(Pawn __instance)
@@ -52,7 +52,7 @@ namespace ImTryingToSaveYou
             if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;   // skip pawns from hostile factions
             if (!__instance.RaceProps.Humanlike) return;                                                // only humanlikes
             bool removed = _originalApparel.Remove(__instance);
-            Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
+            // Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
         }
 
         public static bool WasOriginallyWearing(Pawn pawn, Apparel app)
@@ -81,7 +81,7 @@ namespace ImTryingToSaveYou
                     _originalApparel[pawn] = new HashSet<int>(ids);
                 }
             }
-            Log.Warning($"[ImTryingToSaveYou] OriginalApparelTracker rebuilt for {_originalApparel.Count} pawns");
+            Log.Warning($"[ImTryingToSaveYou] OriginalApparelTracker rebuilt for {_originalApparel.Count} pawn(s)");
         }
 
         // **ADDED**: manually clear all tracked records
