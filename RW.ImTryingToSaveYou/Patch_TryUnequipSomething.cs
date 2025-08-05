@@ -12,8 +12,16 @@ namespace ImTryingToSaveYou
     static class OriginalApparelTracker
     {
         // pawn → set of the thingIDNumbers of Apparel they started with
-        internal static readonly Dictionary<Pawn, HashSet<int>> _originalApparel = new Dictionary<Pawn, HashSet<int>>();
+        internal static Dictionary<Pawn, HashSet<int>> _originalApparel = new Dictionary<Pawn, HashSet<int>>();
         internal static IReadOnlyDictionary<Pawn, HashSet<int>> Records => _originalApparel;
+        public static void RecordsAdd(Pawn pawn, HashSet<int> apparelIds)
+        {
+            _originalApparel[pawn] = apparelIds;
+        }
+        public static void RecordsClear()
+        {
+            _originalApparel.Clear();
+        }
         public static void RemoveRecord(Pawn pawn)
         {
             _originalApparel.Remove(pawn);

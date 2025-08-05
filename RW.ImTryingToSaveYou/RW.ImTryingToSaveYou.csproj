@@ -67,6 +67,7 @@
   <ItemGroup>
     <Compile Include="Debug_OriginalApparelTracker.cs" />
     <Compile Include="ModSettings.cs" />
+    <Compile Include="OriginalApparelGameComponent.cs" />
     <Compile Include="Patch_Faction_Notify_MemberStripped.cs" />
     <Compile Include="Patch_TryUnequipSomething.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
