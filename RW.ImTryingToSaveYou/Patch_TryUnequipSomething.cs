@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
-using LudeonTK;
 using RimWorld;
 using Verse;
 using Verse.AI;
@@ -13,7 +12,12 @@ namespace ImTryingToSaveYou
     static class OriginalApparelTracker
     {
         // pawn → set of the thingIDNumbers of Apparel they started with
-        static readonly Dictionary<Pawn, HashSet<int>> _originalApparel = new Dictionary<Pawn, HashSet<int>>();
+        internal static readonly Dictionary<Pawn, HashSet<int>> _originalApparel = new Dictionary<Pawn, HashSet<int>>();
+        internal static IReadOnlyDictionary<Pawn, HashSet<int>> Records => _originalApparel;
+        public static void RemoveRecord(Pawn pawn)
+        {
+            _originalApparel.Remove(pawn);
+        }
 
         static OriginalApparelTracker()
         {
@@ -43,7 +47,8 @@ namespace ImTryingToSaveYou
 
             _originalApparel[__instance] = new HashSet<int>(ids);
 
-            // Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” spawned, tracking apparel IDs: {string.Join(", ", ids)}");
+            if (ImTryingToSaveYouSettings.ShowLogWarnings)
+                Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” spawned, tracking apparel IDs: {string.Join(", ", ids)}");
         }
 
         static void DeSpawn_Prefix(Pawn __instance)
@@ -52,44 +57,51 @@ namespace ImTryingToSaveYou
             if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;   // skip pawns from hostile factions
             if (!__instance.RaceProps.Humanlike) return;                                                // only humanlikes
             bool removed = _originalApparel.Remove(__instance);
-            // Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
+
+            if (ImTryingToSaveYouSettings.ShowLogWarnings)
+                Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
+        }
+
+        // 3) When a pawn is stripped normally, clear its original-apparel record
+        [StaticConstructorOnStartup]
+        static class Patch_ClearOriginalApparelOnStrip
+        {
+            static Patch_ClearOriginalApparelOnStrip()
+            {
+                var harmony = new Harmony("net.S4.ImTryingToSaveYou.clearoriginalapparelonstrip");
+                harmony.Patch(
+                    AccessTools.Method(typeof(Faction), nameof(Faction.Notify_MemberStripped)),
+                    postfix: new HarmonyMethod(typeof(Patch_ClearOriginalApparelOnStrip), nameof(Notify_MemberStripped_Postfix))
+                );
+            }
+
+            static void Notify_MemberStripped_Postfix(Pawn member, Faction violator)
+            {
+                // only clear records for non-player, non-hostile, humanlike pawns (same conditions as tracking)
+                if (member == null
+                    || member.Faction == Faction.OfPlayer
+                    || member.Faction.HostileTo(Faction.OfPlayer)
+                    || !member.RaceProps.Humanlike)
+                    return;
+
+                // remove the record if it exists
+                if (OriginalApparelTracker.Records.ContainsKey(member))
+                {
+                    OriginalApparelTracker.RemoveRecord(member);
+
+                    if (ImTryingToSaveYouSettings.ShowLogWarnings)
+                    {
+                        bool removed = !OriginalApparelTracker.Records.ContainsKey(member);
+                        Log.Warning($"[ImTryingToSaveYou] Pawn “{member.LabelShort}” was stripped normally — original‐apparel record removed: {removed}");
+                    }
+                }
+            }
         }
 
         public static bool WasOriginallyWearing(Pawn pawn, Apparel app)
         {
             if (pawn == null || app == null) return false;
             return _originalApparel.TryGetValue(pawn, out var set) && set.Contains(app.thingIDNumber);
-        }
-
-        // **NEW**: expose the internal dictionary for debugging
-        public static IReadOnlyDictionary<Pawn, HashSet<int>> Records => _originalApparel;
-
-        // **ADDED**: manually rebuild the tracker for all current pawns
-        public static void RebuildAll()
-        {
-            _originalApparel.Clear();
-            foreach (var map in Find.Maps)
-            {
-                foreach (var pawn in map.mapPawns.AllPawnsSpawned)
-                {
-                    if (pawn.Faction == null || pawn.Faction == Faction.OfPlayer ||
-                        pawn.Faction.HostileTo(Faction.OfPlayer) || !pawn.RaceProps.Humanlike)
-                        continue;
-
-                    var ids = pawn.apparel?.WornApparel.Select(a => a.thingIDNumber)
-                              ?? Enumerable.Empty<int>();
-                    _originalApparel[pawn] = new HashSet<int>(ids);
-                }
-            }
-            Log.Warning($"[ImTryingToSaveYou] OriginalApparelTracker rebuilt for {_originalApparel.Count} pawn(s)");
-        }
-
-        // **ADDED**: manually clear all tracked records
-        public static void Clear()
-        {
-            int count = _originalApparel.Count;
-            _originalApparel.Clear();
-            Log.Warning($"[ImTryingToSaveYou] OriginalApparelTracker cleared ({count} records removed)");
         }
     }
 
@@ -160,37 +172,6 @@ namespace ImTryingToSaveYou
 
             // skip original TryUnequipSomething entirely
             return false;
-        }
-    }
-
-    // 3) DEBUG ACTIONS: add three buttons under the “ImTryingToSaveYou” category
-    [StaticConstructorOnStartup]
-    static class Debug_OriginalApparelTracker
-    {
-        // Strip out actionType & allowedGameStates – they aren’t valid named args here
-        [DebugAction("ImTryingToSaveYou", "Rebuild Original Apparel Tracker")]
-        public static void DebugRebuildTracker()
-        {
-            OriginalApparelTracker.RebuildAll();
-        }
-
-        [DebugAction("ImTryingToSaveYou", "Clear Original Apparel Tracker")]
-        public static void DebugClearTracker()
-        {
-            OriginalApparelTracker.Clear();
-        }
-
-        [DebugAction("ImTryingToSaveYou", "List Original Apparel Records")]
-        public static void DebugListTracker()
-        {
-            var records = OriginalApparelTracker.Records;
-            Log.Warning($"[ImTryingToSaveYou] Tracker has {records.Count} pawn(s):");
-            foreach (var kvp in records)
-            {
-                var pawn = kvp.Key;
-                var ids = kvp.Value;
-                Log.Warning($"  • {pawn.LabelShort}: {string.Join(", ", ids)}");
-            }
         }
     }
 }
