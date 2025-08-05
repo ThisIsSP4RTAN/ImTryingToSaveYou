@@ -19,7 +19,7 @@ namespace ImTryingToSaveYou
             harmony.Patch(finishMethod,
                 prefix: new HarmonyMethod(typeof(Patch_ForceTargetWear_SkipStripFinishAction), nameof(Finish_Prefix)));
 
-            Log.Message("[ImTryingToSaveYou] Patched JobDriver_ForceTargetWear.TryUnequipSomething.Notify_MemberStripped");
+            Log.Message("[ImTryingToSaveYou] Patched JobDriver_ForceTargetWear.Notify_MemberStripped");
         }
 
         // this will run *instead* of the original finish‑action, so we
