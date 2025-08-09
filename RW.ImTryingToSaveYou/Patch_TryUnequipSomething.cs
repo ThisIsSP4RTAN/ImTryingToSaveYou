@@ -40,12 +40,30 @@ namespace ImTryingToSaveYou
                 AccessTools.Method(typeof(Pawn), nameof(Pawn.DeSpawn)),
                 prefix: new HarmonyMethod(typeof(OriginalApparelTracker), nameof(DeSpawn_Prefix))
             );
+
+            // When a pawn changes faction to player, clear their record
+            var setFaction2 = AccessTools.Method(typeof(Pawn), "SetFaction", new[] { typeof(Faction), typeof(Pawn) });
+            var setFaction3 = AccessTools.Method(typeof(Pawn), "SetFaction", new[] { typeof(Faction), typeof(Pawn), typeof(bool) });
+            var setFaction = setFaction2 ?? setFaction3;
+
+            if (setFaction != null)
+            {
+                harmony.Patch(
+                    setFaction,
+                    postfix: new HarmonyMethod(typeof(OriginalApparelTracker), nameof(SetFaction_Postfix))
+                );
+            }
+            else
+            {
+                Log.Warning("[ImTryingToSaveYou] Could not find Pawn.SetFaction overload to patch.");
+            }
         }
 
         static void SpawnSetup_Postfix(Pawn __instance, Map map, bool respawningAfterLoad)
         {
             if (respawningAfterLoad) return;                                                            // don’t overwrite on load
             if (__instance.Faction == Faction.OfPlayer) return;                                         // skip player pawns
+            if (__instance.Faction == null) return;                                                     // skip pawns without a faction
             if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;   // skip pawns from hostile factions
             if (!__instance.RaceProps.Humanlike) return;                                                // only humanlikes
 
@@ -62,12 +80,25 @@ namespace ImTryingToSaveYou
         static void DeSpawn_Prefix(Pawn __instance)
         {
             if (__instance.Faction == Faction.OfPlayer) return;                                         // skip player pawns
+            if (__instance.Faction == null) return;                                                     // skip pawns without a faction
             if (__instance.Faction != null && __instance.Faction.HostileTo(Faction.OfPlayer)) return;   // skip pawns from hostile factions
             if (!__instance.RaceProps.Humanlike) return;                                                // only humanlikes
             bool removed = _originalApparel.Remove(__instance);
 
             if (ImTryingToSaveYouSettings.ShowLogWarnings)
                 Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” despawned, died or became hostile — original‐apparel record removed: {removed}");
+        }
+
+        // 2) When a pawn joins the player faction, clear their original-apparel record
+        static void SetFaction_Postfix(Pawn __instance, [HarmonyArgument(0)] Faction newFaction)
+        {
+            if (newFaction == Faction.OfPlayer)
+            {
+                bool removed = _originalApparel.Remove(__instance);
+
+                if (ImTryingToSaveYouSettings.ShowLogWarnings)
+                    Log.Warning($"[ImTryingToSaveYou] Pawn “{__instance.LabelShort}” joined the colony — original‐apparel record removed: {removed}");
+            }
         }
 
         // 3) When a pawn is stripped normally, clear its original-apparel record
@@ -87,9 +118,10 @@ namespace ImTryingToSaveYou
             {
                 // only clear records for non-player, non-hostile, humanlike pawns (same conditions as tracking)
                 if (member == null
-                    || member.Faction == Faction.OfPlayer
-                    || member.Faction.HostileTo(Faction.OfPlayer)
-                    || !member.RaceProps.Humanlike)
+                    || member.Faction == Faction.OfPlayer           // skip player pawns
+                    || member.Faction == null                       // skip pawns without a faction
+                    || member.Faction.HostileTo(Faction.OfPlayer)   // skip pawns from hostile factions
+                    || !member.RaceProps.Humanlike)                 // only humanlikes
                     return;
 
                 // remove the record if it exists
@@ -113,7 +145,7 @@ namespace ImTryingToSaveYou
         }
     }
 
-    // 2) PATCH: intercept the private TryUnequipSomething
+    // 4) PATCH: intercept the private TryUnequipSomething
     [StaticConstructorOnStartup]
     public static class Patch_ForceTargetWear_TryUnequipSomething
     {
