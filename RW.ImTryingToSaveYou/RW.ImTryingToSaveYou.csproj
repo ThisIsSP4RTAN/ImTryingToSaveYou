@@ -27,7 +27,7 @@
     <Optimize>false</Optimize>
     <OutputPath>..\Mod\ImTryingToSaveYou!\1.6\Assemblies\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>5</WarningLevel>
+    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.3.6.0, Culture=neutral, processorArchitecture=MSIL">
@@ -36,6 +36,10 @@
     </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Hospital">
+      <HintPath>E:\SteamLibrary\steamapps\workshop\content\294100\2992224079\1.6\Assemblies\Hospital.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="System" />
@@ -66,6 +70,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Debug_OriginalApparelTracker.cs" />
+    <Compile Include="HospitalForceWearPatches.cs" />
     <Compile Include="ModSettings.cs" />
     <Compile Include="OriginalApparelGameComponent.cs" />
     <Compile Include="Patch_Faction_Notify_MemberStripped.cs" />
